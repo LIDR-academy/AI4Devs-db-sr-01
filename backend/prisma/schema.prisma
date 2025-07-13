@@ -24,6 +24,7 @@ model Candidate {
   educations        Education[]
   workExperiences   WorkExperience[]
   resumes           Resume[]
+  applications      Application[]
 }
 
 model Education {
@@ -54,4 +55,124 @@ model Resume {
   uploadDate  DateTime
   candidateId Int
   candidate   Candidate @relation(fields: [candidateId], references: [id])
+}
+
+// =========================
+// Recruitment Domain Models
+// =========================
+
+/// Company entity. A company can employ many employees and offer many positions.
+model Company {
+  id        Int        @id @default(autoincrement())
+  name      String     @db.VarChar(255)
+  employees Employee[]
+  positions Position[]
+}
+
+/// Employee entity. Belongs to a company and can conduct interviews.
+model Employee {
+  id         Int        @id @default(autoincrement())
+  companyId  Int
+  name       String     @db.VarChar(100)
+  email      String     @db.VarChar(255)
+  role       String     @db.VarChar(100)
+  isActive   Boolean    @default(true)
+  company    Company    @relation(fields: [companyId], references: [id])
+  interviews Interview[]
+
+  @@index([companyId])
+}
+
+/// Position entity. Offered by a company, linked to an interview flow, and receives applications.
+model Position {
+  id                  Int             @id @default(autoincrement())
+  companyId           Int
+  interviewFlowId     Int
+  title               String          @db.VarChar(100)
+  description         String          // text (large)
+  status              String          @db.VarChar(50)
+  isVisible           Boolean         @default(true)
+  location            String          @db.VarChar(100)
+  jobDescription      String          // text (large)
+  requirements        String          // text (large)
+  responsibilities    String          // text (large)
+  salaryMin           Decimal?
+  salaryMax           Decimal?
+  employmentType      String          @db.VarChar(50)
+  benefits            String          // text (large)
+  companyDescription  String          // text (large)
+  applicationDeadline DateTime?
+  contactInfo         String          @db.VarChar(255)
+  company             Company         @relation(fields: [companyId], references: [id])
+  interviewFlow       InterviewFlow   @relation(fields: [interviewFlowId], references: [id])
+  applications        Application[]
+
+  @@index([companyId])
+  @@index([interviewFlowId])
+}
+
+/// InterviewFlow entity. Defines the flow of interviews for a position.
+model InterviewFlow {
+  id           Int             @id @default(autoincrement())
+  description  String          // text (large)
+  positions    Position[]
+  steps        InterviewStep[]
+}
+
+/// InterviewStep entity. Part of an interview flow, uses an interview type.
+model InterviewStep {
+  id               Int             @id @default(autoincrement())
+  interviewFlowId  Int
+  interviewTypeId  Int
+  name             String          @db.VarChar(100)
+  orderIndex       Int
+  interviewFlow    InterviewFlow   @relation(fields: [interviewFlowId], references: [id])
+  interviewType    InterviewType   @relation(fields: [interviewTypeId], references: [id])
+  interviews       Interview[]
+
+  @@index([interviewFlowId])
+  @@index([interviewTypeId])
+}
+
+/// InterviewType entity. Defines the type of an interview step.
+model InterviewType {
+  id          Int             @id @default(autoincrement())
+  name        String          @db.VarChar(100)
+  description String          // text (large)
+  steps       InterviewStep[]
+}
+
+/// Application entity. Links a candidate to a position.
+model Application {
+  id               Int           @id @default(autoincrement())
+  positionId       Int
+  candidateId      Int
+  applicationDate  DateTime
+  status           String        @db.VarChar(50)
+  notes            String        // text (large)
+  position         Position      @relation(fields: [positionId], references: [id])
+  candidate        Candidate     @relation(fields: [candidateId], references: [id])
+  interviews       Interview[]
+
+  @@index([positionId])
+  @@index([candidateId])
+}
+
+/// Interview entity. Represents an interview for an application and step, conducted by an employee.
+model Interview {
+  id               Int             @id @default(autoincrement())
+  applicationId    Int
+  interviewStepId  Int
+  employeeId       Int
+  interviewDate    DateTime
+  result           String          @db.VarChar(50)
+  score            Int?
+  notes            String          // text (large)
+  application      Application     @relation(fields: [applicationId], references: [id])
+  interviewStep    InterviewStep   @relation(fields: [interviewStepId], references: [id])
+  employee         Employee        @relation(fields: [employeeId], references: [id])
+
+  @@index([applicationId])
+  @@index([interviewStepId])
+  @@index([employeeId])
 }

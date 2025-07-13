@@ -14,6 +14,132 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// =====================================================
+// MODELOS DE NORMALIZACIÓN (Plan 2)
+// =====================================================
+
+// Normalización de Ubicación
+model Country {
+  id    Int    @id @default(autoincrement())
+  name  String @db.VarChar(100)
+  code  String @unique @db.VarChar(2)
+  cities City[]
+}
+
+model City {
+  id        Int     @id @default(autoincrement())
+  name      String  @db.VarChar(100)
+  countryId Int     @map("country_id")
+  country   Country @relation(fields: [countryId], references: [id])
+  addresses Address[]
+}
+
+// Normalización de Contacto
+model ContactType {
+  id      Int       @id @default(autoincrement())
+  name    String    @db.VarChar(50)
+  contacts Contact[]
+}
+
+model Contact {
+  id           Int         @id @default(autoincrement())
+  contactTypeId Int        @map("contact_type_id")
+  value        String      @db.VarChar(255)
+  isPrimary    Boolean     @default(false) @map("is_primary")
+  candidateId  Int?
+  employeeId   Int?
+  contactType  ContactType @relation(fields: [contactTypeId], references: [id])
+  candidate    Candidate?  @relation(fields: [candidateId], references: [id])
+  employee     Employee?   @relation(fields: [employeeId], references: [id])
+}
+
+// Normalización de Direcciones
+model Address {
+  id          Int      @id @default(autoincrement())
+  street      String?  @db.VarChar(255)
+  number      String?  @db.VarChar(10)
+  postalCode  String?  @map("postal_code") @db.VarChar(10)
+  cityId      Int?     @map("city_id")
+  candidateId Int?
+  companyId   Int?
+  city        City?    @relation(fields: [cityId], references: [id])
+  candidate   Candidate? @relation(fields: [candidateId], references: [id])
+  company     Company? @relation(fields: [companyId], references: [id])
+}
+
+// Normalización de Habilidades
+model SkillCategory {
+  id     Int     @id @default(autoincrement())
+  name   String  @db.VarChar(100)
+  description String? @db.Text
+  skills Skill[]
+}
+
+model Skill {
+  id           Int           @id @default(autoincrement())
+  name         String        @db.VarChar(100)
+  categoryId   Int           @map("category_id")
+  category     SkillCategory @relation(fields: [categoryId], references: [id])
+  candidateSkills CandidateSkill[]
+  positionSkills PositionSkill[]
+}
+
+model CandidateSkill {
+  id              Int     @id @default(autoincrement())
+  candidateId     Int     @map("candidate_id")
+  skillId         Int     @map("skill_id")
+  level           String? @db.VarChar(50) // beginner, intermediate, advanced, expert
+  yearsExperience Int?
+  candidate       Candidate @relation(fields: [candidateId], references: [id])
+  skill           Skill     @relation(fields: [skillId], references: [id])
+}
+
+model PositionSkill {
+  id            Int     @id @default(autoincrement())
+  positionId    Int     @map("position_id")
+  skillId       Int     @map("skill_id")
+  requiredLevel String? @map("required_level") @db.VarChar(50)
+  isMandatory   Boolean @default(false) @map("is_mandatory")
+  position      Position @relation(fields: [positionId], references: [id])
+  skill         Skill    @relation(fields: [skillId], references: [id])
+}
+
+// Normalización de Documentos
+model DocumentType {
+  id          Int        @id @default(autoincrement())
+  name        String     @db.VarChar(50)
+  description String?    @db.Text
+  documents   Document[]
+}
+
+model Document {
+  id             Int          @id @default(autoincrement())
+  documentTypeId Int?         @map("document_type_id")
+  name           String?      @db.VarChar(255)
+  filePath       String       @db.VarChar(500)
+  fileType       String       @db.VarChar(50)
+  uploadDate     DateTime     @map("upload_date")
+  candidateId    Int          @map("candidate_id")
+  documentType   DocumentType? @relation(fields: [documentTypeId], references: [id])
+  candidate      Candidate    @relation(fields: [candidateId], references: [id])
+}
+
+// Auditoría y Trazabilidad
+model AuditLog {
+  id         Int      @id @default(autoincrement())
+  tableName  String   @map("table_name") @db.VarChar(50)
+  recordId   Int      @map("record_id")
+  action     String   @db.VarChar(20) // INSERT, UPDATE, DELETE
+  oldValues  Json?    @map("old_values")
+  newValues  Json?    @map("new_values")
+  userId     Int?
+  timestamp  DateTime @default(now())
+}
+
+// =====================================================
+// MODELOS ORIGINALES (Sistema de Candidatos) - ACTUALIZADOS
+// =====================================================
+
 model Candidate {
   id                Int               @id @default(autoincrement())
   firstName         String            @db.VarChar(100)
@@ -21,9 +147,21 @@ model Candidate {
   email             String            @unique @db.VarChar(255)
   phone             String?           @db.VarChar(15)
   address           String?           @db.VarChar(100)
+  // Campos de auditoría
+  createdAt         DateTime          @default(now()) @map("created_at")
+  updatedAt         DateTime          @updatedAt @map("updated_at")
+  createdBy         Int?
+  updatedBy         Int?
+  // Relaciones originales
   educations        Education[]
   workExperiences   WorkExperience[]
   resumes           Resume[]
+  applications      Application[]
+  // Relaciones normalizadas
+  contacts          Contact[]
+  addresses         Address[]
+  candidateSkills   CandidateSkill[]
+  documents         Document[]
 }
 
 model Education {
@@ -54,4 +192,134 @@ model Resume {
   uploadDate  DateTime
   candidateId Int
   candidate   Candidate @relation(fields: [candidateId], references: [id])
+}
+
+// =====================================================
+// NUEVOS MODELOS (Sistema de Reclutamiento) - ACTUALIZADOS
+// =====================================================
+
+model Company {
+  id        Int        @id @default(autoincrement())
+  name      String     @db.VarChar(255)
+  // Campos de auditoría
+  createdAt DateTime   @default(now()) @map("created_at")
+  updatedAt DateTime   @updatedAt @map("updated_at")
+  createdBy Int?
+  updatedBy Int?
+  // Relaciones
+  employees Employee[]
+  positions Position[]
+  addresses Address[]
+}
+
+model Employee {
+  id         Int       @id @default(autoincrement())
+  companyId  Int       @map("company_id")
+  name       String    @db.VarChar(255)
+  email      String    @unique @db.VarChar(255)
+  role       String    @db.VarChar(100)
+  isActive   Boolean   @default(true) @map("is_active")
+  // Campos de auditoría
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+  createdBy  Int?
+  updatedBy  Int?
+  // Relaciones
+  company    Company   @relation(fields: [companyId], references: [id])
+  interviews Interview[]
+  contacts   Contact[]
+}
+
+model InterviewType {
+  id              Int             @id @default(autoincrement())
+  name            String          @db.VarChar(100)
+  description     String?         @db.Text
+  interviewSteps  InterviewStep[]
+}
+
+model InterviewFlow {
+  id              Int             @id @default(autoincrement())
+  description     String          @db.VarChar(255)
+  positions       Position[]
+  interviewSteps  InterviewStep[]
+}
+
+model InterviewStep {
+  id               Int           @id @default(autoincrement())
+  interviewFlowId  Int           @map("interview_flow_id")
+  interviewTypeId  Int           @map("interview_type_id")
+  name             String        @db.VarChar(255)
+  orderIndex       Int           @map("order_index")
+  interviewFlow    InterviewFlow @relation(fields: [interviewFlowId], references: [id])
+  interviewType    InterviewType @relation(fields: [interviewTypeId], references: [id])
+  interviews       Interview[]
+}
+
+model Position {
+  id                  Int             @id @default(autoincrement())
+  companyId           Int             @map("company_id")
+  interviewFlowId     Int             @map("interview_flow_id")
+  title               String          @db.VarChar(255)
+  description         String?         @db.Text
+  status              String          @default("active") @db.VarChar(50)
+  isVisible           Boolean         @default(true) @map("is_visible")
+  location            String?         @db.VarChar(255)
+  jobDescription      String?         @map("job_description") @db.Text
+  requirements        String?         @db.Text
+  responsibilities    String?         @db.Text
+  salaryMin           Decimal?        @map("salary_min") @db.Decimal(10,2)
+  salaryMax           Decimal?        @map("salary_max") @db.Decimal(10,2)
+  employmentType      String?         @map("employment_type") @db.VarChar(50)
+  benefits            String?         @map("benefits") @db.Text
+  companyDescription  String?         @map("company_description") @db.Text
+  applicationDeadline DateTime?       @map("application_deadline") @db.Date
+  contactInfo         String?         @map("contact_info") @db.Text
+  // Campos de auditoría
+  createdAt           DateTime        @default(now()) @map("created_at")
+  updatedAt           DateTime        @updatedAt @map("updated_at")
+  createdBy           Int?
+  updatedBy           Int?
+  // Relaciones
+  company             Company         @relation(fields: [companyId], references: [id])
+  interviewFlow       InterviewFlow   @relation(fields: [interviewFlowId], references: [id])
+  applications        Application[]
+  positionSkills      PositionSkill[]
+}
+
+model Application {
+  id              Int         @id @default(autoincrement())
+  positionId      Int         @map("position_id")
+  candidateId     Int         @map("candidate_id")
+  applicationDate DateTime    @default(now()) @map("application_date") @db.Date
+  status          String      @default("pending") @db.VarChar(50)
+  notes           String?     @db.Text
+  // Campos de auditoría
+  createdAt       DateTime    @default(now()) @map("created_at")
+  updatedAt       DateTime    @updatedAt @map("updated_at")
+  createdBy       Int?
+  updatedBy       Int?
+  // Relaciones
+  position        Position    @relation(fields: [positionId], references: [id])
+  candidate       Candidate   @relation(fields: [candidateId], references: [id])
+  interviews      Interview[]
+}
+
+model Interview {
+  id               Int           @id @default(autoincrement())
+  applicationId    Int           @map("application_id")
+  interviewStepId  Int           @map("interview_step_id")
+  employeeId       Int           @map("employee_id")
+  interviewDate    DateTime      @map("interview_date") @db.Date
+  result           String?       @db.VarChar(50)
+  score            Int?
+  notes            String?       @db.Text
+  // Campos de auditoría
+  createdAt        DateTime      @default(now()) @map("created_at")
+  updatedAt        DateTime      @updatedAt @map("updated_at")
+  createdBy        Int?
+  updatedBy        Int?
+  // Relaciones
+  application      Application   @relation(fields: [applicationId], references: [id])
+  interviewStep    InterviewStep @relation(fields: [interviewStepId], references: [id])
+  employee         Employee      @relation(fields: [employeeId], references: [id])
 }

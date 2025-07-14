@@ -14,6 +14,7 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// Modelos existentes (sin modificaciones)
 model Candidate {
   id                Int               @id @default(autoincrement())
   firstName         String            @db.VarChar(100)
@@ -24,6 +25,7 @@ model Candidate {
   educations        Education[]
   workExperiences   WorkExperience[]
   resumes           Resume[]
+  applications      Application[]
 }
 
 model Education {
@@ -54,4 +56,180 @@ model Resume {
   uploadDate  DateTime
   candidateId Int
   candidate   Candidate @relation(fields: [candidateId], references: [id])
+}
+
+// Nuevos modelos para el sistema de aplicaciones
+model Company {
+  id        Int        @id @default(autoincrement())
+  name      String     @db.VarChar(255)
+  employees Employee[]
+  positions Position[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  createdBy String?    @db.VarChar(100)
+  updatedBy String?    @db.VarChar(100)
+
+  @@map("Company")
+}
+
+model Employee {
+  id        Int        @id @default(autoincrement())
+  companyId Int
+  name      String     @db.VarChar(255)
+  email     String     @unique @db.VarChar(255)
+  role      String     @db.VarChar(100)
+  isActive  Boolean    @default(true)
+  company   Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  interviews Interview[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  createdBy String?    @db.VarChar(100)
+  updatedBy String?    @db.VarChar(100)
+
+  @@map("Employee")
+}
+
+model InterviewFlow {
+  id          Int             @id @default(autoincrement())
+  description String
+  positions   Position[]
+  steps       InterviewStep[]
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  createdBy   String?         @db.VarChar(100)
+  updatedBy   String?         @db.VarChar(100)
+
+  @@map("InterviewFlow")
+}
+
+model InterviewType {
+  id          Int             @id @default(autoincrement())
+  name        String          @unique @db.VarChar(100)
+  description String?
+  steps       InterviewStep[]
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  createdBy   String?         @db.VarChar(100)
+  updatedBy   String?         @db.VarChar(100)
+
+  @@map("InterviewType")
+}
+
+model Position {
+  id                    Int           @id @default(autoincrement())
+  companyId             Int
+  interviewFlowId       Int
+  title                 String        @db.VarChar(255)
+  description           String?
+  status                PositionStatus @default(DRAFT)
+  isVisible             Boolean       @default(true)
+  location              String?       @db.VarChar(255)
+  jobDescription        String?
+  requirements          String?
+  responsibilities      String?
+  salaryMin             Decimal?      @db.Decimal(10, 2)
+  salaryMax             Decimal?      @db.Decimal(10, 2)
+  employmentType        EmploymentType?
+  benefits              String?
+  companyDescription    String?
+  applicationDeadline   DateTime?
+  contactInfo           String?
+  company               Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  interviewFlow         InterviewFlow @relation(fields: [interviewFlowId], references: [id])
+  applications          Application[]
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
+  createdBy             String?       @db.VarChar(100)
+  updatedBy             String?       @db.VarChar(100)
+
+  @@map("Position")
+}
+
+model InterviewStep {
+  id              Int           @id @default(autoincrement())
+  interviewFlowId Int
+  interviewTypeId Int
+  name            String        @db.VarChar(255)
+  orderIndex      Int
+  interviewFlow   InterviewFlow @relation(fields: [interviewFlowId], references: [id], onDelete: Cascade)
+  interviewType   InterviewType @relation(fields: [interviewTypeId], references: [id])
+  interviews      Interview[]
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  createdBy       String?       @db.VarChar(100)
+  updatedBy       String?       @db.VarChar(100)
+
+  @@unique([interviewFlowId, orderIndex])
+  @@map("InterviewStep")
+}
+
+model Application {
+  id            Int              @id @default(autoincrement())
+  positionId    Int
+  candidateId   Int
+  applicationDate DateTime       @default(now())
+  status        ApplicationStatus @default(APPLIED)
+  notes         String?
+  position      Position         @relation(fields: [positionId], references: [id], onDelete: Cascade)
+  candidate     Candidate        @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  interviews    Interview[]
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  createdBy     String?          @db.VarChar(100)
+  updatedBy     String?          @db.VarChar(100)
+
+  @@unique([positionId, candidateId])
+  @@map("Application")
+}
+
+model Interview {
+  id              Int            @id @default(autoincrement())
+  applicationId   Int
+  interviewStepId Int
+  employeeId      Int
+  interviewDate   DateTime
+  result          InterviewResult @default(PENDING)
+  score           Int?
+  notes           String?
+  application     Application    @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  interviewStep   InterviewStep  @relation(fields: [interviewStepId], references: [id])
+  employee        Employee       @relation(fields: [employeeId], references: [id])
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  createdBy       String?        @db.VarChar(100)
+  updatedBy       String?        @db.VarChar(100)
+
+  @@map("Interview")
+}
+
+// Enums para validación de datos
+enum PositionStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  CLOSED
+}
+
+enum EmploymentType {
+  FULL_TIME
+  PART_TIME
+  CONTRACT
+  INTERNSHIP
+}
+
+enum ApplicationStatus {
+  APPLIED
+  REVIEWING
+  INTERVIEWING
+  OFFERED
+  HIRED
+  REJECTED
+  WITHDRAWN
+}
+
+enum InterviewResult {
+  PENDING
+  PASSED
+  FAILED
+  CANCELLED
 }

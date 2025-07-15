@@ -9,8 +9,10 @@
         "build": "tsc",
         "prisma:init": "npx prisma init",
         "prisma:generate": "npx prisma generate",
+        "prisma:migrate": "npx prisma migrate dev",
+        "prisma:seed": "npx ts-node prisma/seed.ts",
         "start:prod": "npm run build && npm start",
-        "test": "jest" 
+        "test": "jest"
     },
     "keywords": [],
     "author": "",

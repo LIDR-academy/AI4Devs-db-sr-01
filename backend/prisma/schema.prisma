@@ -14,6 +14,73 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model Company {
+  id          Int        @id @default(autoincrement())
+  name        String     @db.VarChar(255)
+  employees   Employee[]
+  positions   Position[]
+}
+
+model Employee {
+  id         Int         @id @default(autoincrement())
+  companyId  Int
+  name       String      @db.VarChar(255)
+  email      String      @db.VarChar(255)
+  role       String      @db.VarChar(100)
+  isActive   Boolean     @default(true)
+  company    Company     @relation(fields: [companyId], references: [id])
+  interviews Interview[]
+}
+
+model InterviewType {
+  id             Int             @id @default(autoincrement())
+  name           String          @db.VarChar(100)
+  description    String?         @db.Text
+  interviewSteps InterviewStep[]
+}
+
+model InterviewFlow {
+  id             Int             @id @default(autoincrement())
+  description    String          @db.VarChar(255)
+  positions      Position[]
+  interviewSteps InterviewStep[]
+}
+
+model InterviewStep {
+  id               Int           @id @default(autoincrement())
+  interviewFlowId  Int
+  interviewTypeId  Int
+  name             String        @db.VarChar(100)
+  orderIndex       Int
+  interviewFlow    InterviewFlow @relation(fields: [interviewFlowId], references: [id])
+  interviewType    InterviewType @relation(fields: [interviewTypeId], references: [id])
+  interviews       Interview[]
+}
+
+model Position {
+  id                  Int           @id @default(autoincrement())
+  companyId           Int
+  interviewFlowId     Int
+  title               String        @db.VarChar(255)
+  description         String?       @db.Text
+  status              String        @db.VarChar(50)
+  isVisible           Boolean       @default(true)
+  location            String?       @db.VarChar(255)
+  jobDescription      String?       @db.Text
+  requirements        String?       @db.Text
+  responsibilities    String?       @db.Text
+  salaryMin           Decimal?      @db.Decimal(10, 2)
+  salaryMax           Decimal?      @db.Decimal(10, 2)
+  employmentType      String?       @db.VarChar(50)
+  benefits            String?       @db.Text
+  companyDescription  String?       @db.Text
+  applicationDeadline DateTime?     @db.Date
+  contactInfo         String?       @db.Text
+  company             Company       @relation(fields: [companyId], references: [id])
+  interviewFlow       InterviewFlow @relation(fields: [interviewFlowId], references: [id])
+  applications        Application[]
+}
+
 model Candidate {
   id                Int               @id @default(autoincrement())
   firstName         String            @db.VarChar(100)
@@ -24,6 +91,33 @@ model Candidate {
   educations        Education[]
   workExperiences   WorkExperience[]
   resumes           Resume[]
+  applications      Application[]
+}
+
+model Application {
+  id              Int         @id @default(autoincrement())
+  positionId      Int
+  candidateId     Int
+  applicationDate DateTime    @db.Date
+  status          String      @db.VarChar(50)
+  notes           String?     @db.Text
+  position        Position    @relation(fields: [positionId], references: [id])
+  candidate       Candidate   @relation(fields: [candidateId], references: [id])
+  interviews      Interview[]
+}
+
+model Interview {
+  id              Int           @id @default(autoincrement())
+  applicationId   Int
+  interviewStepId Int
+  employeeId      Int
+  interviewDate   DateTime      @db.Date
+  result          String?       @db.VarChar(50)
+  score           Int?
+  notes           String?       @db.Text
+  application     Application   @relation(fields: [applicationId], references: [id])
+  interviewStep   InterviewStep @relation(fields: [interviewStepId], references: [id])
+  employee        Employee      @relation(fields: [employeeId], references: [id])
 }
 
 model Education {

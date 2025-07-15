@@ -2,6 +2,9 @@
 
 Este directorio agrupa **todos los artefactos generados** para ampliar el esquema PostgreSQL de la aplicación conforme al ERD de gestión de talento.
 
+## 👤 Autor
+Ignacio Marco 
+
 ## 📜 Resumen de acciones ejecutadas
 1. **Preparación**: se creó este directorio y se copió el `schema.prisma` original para trabajar sobre una copia.
 2. **Análisis**: se introspectó el esquema existente (`prisma db pull`) y se identificaron las tablas faltantes.

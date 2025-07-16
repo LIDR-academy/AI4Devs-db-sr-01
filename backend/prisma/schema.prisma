@@ -14,44 +14,448 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model Candidate {
-  id                Int               @id @default(autoincrement())
-  firstName         String            @db.VarChar(100)
-  lastName          String            @db.VarChar(100)
-  email             String            @unique @db.VarChar(255)
-  phone             String?           @db.VarChar(15)
-  address           String?           @db.VarChar(100)
-  educations        Education[]
-  workExperiences   WorkExperience[]
-  resumes           Resume[]
+// Tablas de referencia normalizadas
+model Country {
+  id       Int      @id @default(autoincrement())
+  name     String   @unique @db.VarChar(100)
+  code     String   @unique @db.VarChar(3)
+  cities   City[]
+  companies Company[]
+
+  @@index([name])
 }
 
-model Education {
+model City {
+  id        Int       @id @default(autoincrement())
+  name      String    @db.VarChar(100)
+  countryId Int
+  country   Country   @relation(fields: [countryId], references: [id])
+  positions Position[]
+  candidates Candidate[]
+  
+  @@unique([name, countryId])
+  @@index([countryId])
+  @@index([name])
+}
+
+model EmploymentType {
+  id        Int        @id @default(autoincrement())
+  name      String     @unique @db.VarChar(50)
+  description String?  @db.Text
+  positions Position[]
+
+  @@index([name])
+}
+
+model PositionStatus {
+  id        Int        @id @default(autoincrement())
+  name      String     @unique @db.VarChar(50)
+  description String?  @db.Text
+  positions Position[]
+
+  @@index([name])
+}
+
+model ApplicationStatus {
+  id           Int           @id @default(autoincrement())
+  name         String        @unique @db.VarChar(50)
+  description  String?       @db.Text
+  applications Application[]
+
+  @@index([name])
+}
+
+model FileType {
+  id       Int      @id @default(autoincrement())
+  name     String   @unique @db.VarChar(50)
+  extension String  @unique @db.VarChar(10)
+  mimeType String   @db.VarChar(100)
+  resumes  Resume[]
+
+  @@index([extension])
+  @@index([name])
+}
+
+model InstitutionType {
+  id          Int         @id @default(autoincrement())
+  name        String      @unique @db.VarChar(50)
+  description String?     @db.Text
+  educations  Education[]
+
+  @@index([name])
+}
+
+model Skill {
+  id               Int               @id @default(autoincrement())
+  name             String            @unique @db.VarChar(100)
+  category         String            @db.VarChar(50)
+  candidateSkills  CandidateSkill[]
+  positionSkills   PositionSkill[]
+
+  @@index([name])
+  @@index([category])
+  @@index([category, name])
+}
+
+model SalaryRange {
+  id        Int        @id @default(autoincrement())
+  minSalary Decimal    @db.Decimal(10, 2)
+  maxSalary Decimal    @db.Decimal(10, 2)
+  currency  String     @db.VarChar(3)
+  period    String     @db.VarChar(20) // monthly, yearly, hourly
+  positions Position[]
+
+  @@index([currency, period])
+  @@index([minSalary, maxSalary])
+}
+
+// Modelo de empresa normalizado
+model Company {
+  id          Int       @id @default(autoincrement())
+  name        String    @db.VarChar(255)
+  description String?   @db.Text
+  website     String?   @db.VarChar(255)
+  industry    String?   @db.VarChar(100)
+  size        String?   @db.VarChar(50) // startup, small, medium, large, enterprise
+  founded     Int?
+  countryId   Int?
+  country     Country?  @relation(fields: [countryId], references: [id])
+  employees   Employee[]
+  positions   Position[]
+  contacts    CompanyContact[]
+
+  @@index([name])
+  @@index([industry])
+  @@index([size])
+  @@index([countryId])
+  @@index([industry, size])
+}
+
+model CompanyContact {
+  id        Int     @id @default(autoincrement())
+  companyId Int
+  type      String  @db.VarChar(50) // email, phone, address
+  value     String  @db.VarChar(255)
+  isPrimary Boolean @default(false)
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([companyId, isPrimary])
+  @@index([type])
+}
+
+// Modelo de empleado
+model Employee {
+  id         Int         @id @default(autoincrement())
+  companyId  Int
+  name       String      @db.VarChar(255)
+  email      String      @unique @db.VarChar(255)
+  role       String      @db.VarChar(100)
+  isActive   Boolean     @default(true)
+  company    Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  interviews Interview[]
+
+  @@index([companyId])
+  @@index([isActive])
+  @@index([companyId, isActive])
+  @@index([name])
+  @@index([role])
+  @@index([email])
+}
+
+// Modelo de flujo de entrevista
+model InterviewFlow {
+  id             Int              @id @default(autoincrement())
+  name           String           @db.VarChar(255)
+  description    String?          @db.Text
+  isActive       Boolean          @default(true)
+  positions      Position[]
+  interviewSteps InterviewStep[]
+
+  @@index([isActive])
+  @@index([name])
+}
+
+// Modelo de tipo de entrevista
+model InterviewType {
+  id             Int              @id @default(autoincrement())
+  name           String           @db.VarChar(255)
+  description    String?          @db.Text
+  duration       Int?             // duration in minutes
+  isActive       Boolean          @default(true)
+  interviewSteps InterviewStep[]
+
+  @@index([isActive])
+  @@index([name])
+  @@index([duration])
+}
+
+// Modelo de paso de entrevista
+model InterviewStep {
+  id               Int           @id @default(autoincrement())
+  interviewFlowId  Int
+  interviewTypeId  Int
+  name             String        @db.VarChar(255)
+  description      String?       @db.Text
+  orderIndex       Int
+  isRequired       Boolean       @default(true)
+  interviewFlow    InterviewFlow @relation(fields: [interviewFlowId], references: [id], onDelete: Cascade)
+  interviewType    InterviewType @relation(fields: [interviewTypeId], references: [id], onDelete: Restrict)
+  interviews       Interview[]
+
+  @@index([interviewFlowId])
+  @@index([interviewTypeId])
+  @@index([interviewFlowId, orderIndex])
+  @@index([isRequired])
+}
+
+// Modelo de posición/trabajo normalizado
+model Position {
+  id                  Int             @id @default(autoincrement())
+  companyId           Int
+  interviewFlowId     Int
+  positionStatusId    Int
+  employmentTypeId    Int?
+  salaryRangeId       Int?
+  cityId              Int?
+  title               String          @db.VarChar(255)
+  description         String?         @db.Text
+  isVisible           Boolean         @default(true)
+  jobDescription      String?         @db.Text
+  requirements        String?         @db.Text
+  responsibilities    String?         @db.Text
+  benefits            String?         @db.Text
+  applicationDeadline DateTime?       @db.Date
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+  company             Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  interviewFlow       InterviewFlow   @relation(fields: [interviewFlowId], references: [id], onDelete: Restrict)
+  positionStatus      PositionStatus  @relation(fields: [positionStatusId], references: [id])
+  employmentType      EmploymentType? @relation(fields: [employmentTypeId], references: [id])
+  salaryRange         SalaryRange?    @relation(fields: [salaryRangeId], references: [id])
+  city                City?           @relation(fields: [cityId], references: [id])
+  applications        Application[]
+  positionSkills      PositionSkill[]
+  contacts            PositionContact[]
+
+  // Índices críticos para búsquedas frecuentes
+  @@index([companyId])
+  @@index([positionStatusId])
+  @@index([isVisible])
+  @@index([cityId])
+  @@index([employmentTypeId])
+  @@index([salaryRangeId])
+  @@index([applicationDeadline])
+  @@index([createdAt])
+  @@index([updatedAt])
+  // Índices compuestos para consultas complejas
+  @@index([companyId, positionStatusId, isVisible])
+  @@index([cityId, employmentTypeId, isVisible])
+  @@index([salaryRangeId, cityId, isVisible])
+  @@index([createdAt, applicationDeadline])
+  @@index([isVisible, createdAt])
+  @@index([title])
+}
+
+model PositionContact {
+  id         Int      @id @default(autoincrement())
+  positionId Int
+  type       String   @db.VarChar(50) // email, phone
+  value      String   @db.VarChar(255)
+  isPrimary  Boolean  @default(false)
+  position   Position @relation(fields: [positionId], references: [id], onDelete: Cascade)
+
+  @@index([positionId])
+  @@index([positionId, isPrimary])
+  @@index([type])
+}
+
+model PositionSkill {
+  id         Int      @id @default(autoincrement())
+  positionId Int
+  skillId    Int
+  isRequired Boolean  @default(false)
+  level      String?  @db.VarChar(50) // beginner, intermediate, advanced, expert
+  position   Position @relation(fields: [positionId], references: [id], onDelete: Cascade)
+  skill      Skill    @relation(fields: [skillId], references: [id])
+  
+  @@unique([positionId, skillId])
+  @@index([positionId])
+  @@index([skillId])
+  @@index([isRequired, level])
+  @@index([level])
+}
+
+// Modelo de candidato normalizado
+model Candidate {
+  id              Int               @id @default(autoincrement())
+  firstName       String            @db.VarChar(100)
+  lastName        String            @db.VarChar(100)
+  email           String            @unique @db.VarChar(255)
+  cityId          Int?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  city            City?             @relation(fields: [cityId], references: [id])
+  educations      Education[]
+  workExperiences WorkExperience[]
+  resumes         Resume[]
+  applications    Application[]
+  candidateSkills CandidateSkill[]
+  contacts        CandidateContact[]
+
+  @@index([email])
+  @@index([cityId])
+  @@index([createdAt])
+  @@index([updatedAt])
+  @@index([firstName, lastName])
+  @@index([createdAt, updatedAt])
+}
+
+model CandidateContact {
+  id          Int       @id @default(autoincrement())
+  candidateId Int
+  type        String    @db.VarChar(50) // phone, address, linkedin, etc.
+  value       String    @db.VarChar(255)
+  isPrimary   Boolean   @default(false)
+  candidate   Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+
+  @@index([candidateId])
+  @@index([candidateId, isPrimary])
+  @@index([type])
+}
+
+model CandidateSkill {
   id            Int       @id @default(autoincrement())
-  institution   String    @db.VarChar(100)
-  title         String    @db.VarChar(250)
-  startDate     DateTime
-  endDate       DateTime?
   candidateId   Int
-  candidate     Candidate @relation(fields: [candidateId], references: [id])
+  skillId       Int
+  level         String?   @db.VarChar(50) // beginner, intermediate, advanced, expert
+  yearsOfExperience Int?
+  candidate     Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  skill         Skill     @relation(fields: [skillId], references: [id])
+  
+  @@unique([candidateId, skillId])
+  @@index([candidateId])
+  @@index([skillId])
+  @@index([level, yearsOfExperience])
+  @@index([yearsOfExperience])
+}
+
+// Modelo de aplicación
+model Application {
+  id                  Int               @id @default(autoincrement())
+  positionId          Int
+  candidateId         Int
+  applicationStatusId Int
+  applicationDate     DateTime          @default(now()) @db.Date
+  notes               String?           @db.Text
+  source              String?           @db.VarChar(100) // website, referral, linkedin, etc.
+  position            Position          @relation(fields: [positionId], references: [id], onDelete: Cascade)
+  candidate           Candidate         @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  applicationStatus   ApplicationStatus @relation(fields: [applicationStatusId], references: [id])
+  interviews          Interview[]
+
+  @@index([positionId])
+  @@index([candidateId])
+  @@index([applicationStatusId])
+  @@index([applicationDate])
+  @@index([source])
+  @@index([applicationDate, applicationStatusId])
+  @@index([positionId, applicationStatusId])
+  @@index([candidateId, applicationDate])
+}
+
+// Modelo de entrevista
+model Interview {
+  id               Int           @id @default(autoincrement())
+  applicationId    Int
+  interviewStepId  Int
+  employeeId       Int
+  interviewDate    DateTime      @db.Date
+  startTime        DateTime?     @db.Time
+  endTime          DateTime?     @db.Time
+  result           String?       @db.VarChar(50)
+  score            Int?          @db.Integer
+  notes            String?       @db.Text
+  feedback         String?       @db.Text
+  createdAt        DateTime      @default(now())
+  application      Application   @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  interviewStep    InterviewStep @relation(fields: [interviewStepId], references: [id], onDelete: Restrict)
+  employee         Employee      @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+
+  @@index([applicationId])
+  @@index([interviewStepId])
+  @@index([employeeId])
+  @@index([interviewDate])
+  @@index([result])
+  @@index([score])
+  @@index([employeeId, interviewDate])
+  @@index([interviewDate, result])
+  @@index([applicationId, interviewDate])
+}
+
+// Modelos existentes normalizados
+model Education {
+  id                 Int              @id @default(autoincrement())
+  institution        String           @db.VarChar(100)
+  institutionTypeId  Int?
+  title              String           @db.VarChar(250)
+  degree             String?          @db.VarChar(100)
+  fieldOfStudy       String?          @db.VarChar(100)
+  gpa                Decimal?         @db.Decimal(3, 2)
+  startDate          DateTime
+  endDate            DateTime?
+  isCurrent          Boolean          @default(false)
+  candidateId        Int
+  candidate          Candidate        @relation(fields: [candidateId], references: [id])
+  institutionType    InstitutionType? @relation(fields: [institutionTypeId], references: [id])
+
+  @@index([candidateId])
+  @@index([institutionTypeId])
+  @@index([startDate])
+  @@index([endDate])
+  @@index([isCurrent])
+  @@index([institution])
+  @@index([fieldOfStudy])
+  @@index([gpa])
 }
 
 model WorkExperience {
-  id          Int       @id @default(autoincrement())
-  company     String    @db.VarChar(100)
-  position    String    @db.VarChar(100)
-  description String?   @db.VarChar(200)
-  startDate   DateTime
-  endDate     DateTime?
-  candidateId Int
-  candidate   Candidate @relation(fields: [candidateId], references: [id])
+  id            Int       @id @default(autoincrement())
+  company       String    @db.VarChar(100)
+  position      String    @db.VarChar(100)
+  description   String?   @db.VarChar(500)
+  achievements  String?   @db.Text
+  startDate     DateTime
+  endDate       DateTime?
+  isCurrent     Boolean   @default(false)
+  candidateId   Int
+  candidate     Candidate @relation(fields: [candidateId], references: [id])
+
+  @@index([candidateId])
+  @@index([startDate])
+  @@index([endDate])
+  @@index([isCurrent])
+  @@index([company])
+  @@index([position])
+  @@index([candidateId, isCurrent])
 }
 
 model Resume {
   id          Int       @id @default(autoincrement())
+  fileName    String    @db.VarChar(255)
   filePath    String    @db.VarChar(500)
-  fileType    String    @db.VarChar(50)
-  uploadDate  DateTime
+  fileTypeId  Int
+  fileSize    Int?      // size in bytes
+  uploadDate  DateTime  @default(now())
+  isActive    Boolean   @default(true)
   candidateId Int
   candidate   Candidate @relation(fields: [candidateId], references: [id])
+  fileType    FileType  @relation(fields: [fileTypeId], references: [id])
+
+  @@index([candidateId])
+  @@index([fileTypeId])
+  @@index([uploadDate])
+  @@index([isActive])
+  @@index([candidateId, isActive])
+  @@index([fileName])
 }
